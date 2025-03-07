@@ -1,4 +1,3 @@
-// app/blog/tag/[tag]/page.tsx
 import { createClient } from 'contentful';
 import BlogGrid from '@/components/BlogGrid';
 import { BlogPost } from '@/types/blog';
@@ -30,8 +29,8 @@ export async function generateStaticParams() {
 }
 
 // Main page component
-export default async function TagPage({ params }: { params: { tag: string } }) {
-  const tagSlug = params.tag;
+export default async function TagPage({ params }: { params: Promise<{ tag: string }> }) {
+  const { tag: tagSlug } = await params;
   const formattedTag = tagSlug.replace(/-/g, ' '); // Convert slug to readable format
   
   const client = createClient({
