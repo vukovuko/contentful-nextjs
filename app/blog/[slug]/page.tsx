@@ -8,7 +8,8 @@ import { cookies } from 'next/headers'
 
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const cookieStore = await cookies()
-  const isPreview = cookieStore.has('__prerender_bypass');
+  const previewCookie = cookieStore.get('__prerender_bypass')
+  const isPreview = previewCookie && previewCookie.value === 'true';
 
   const currentClient = isPreview ? previewClient : client
   
