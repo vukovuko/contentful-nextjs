@@ -1,13 +1,19 @@
 import { notFound } from "next/navigation";
-import client from "@/lib/contentful";
+import { client, previewClient } from "@/lib/contentful";
 import { BlogPost } from "@/types/blog";
 import Link from "next/link";
 import RichText from "@/components/RichText";
 import { Document } from '@contentful/rich-text-types';
+import { cookies } from 'next/headers'
 
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
+  const cookieStore = await cookies()
+  const isPreview = cookieStore.has('__prerender_bypass');
+
+  const currentClient = isPreview ? previewClient : client
+  
   const { slug } = await params;
-  const entries = await client.getEntries({
+  const entries = await currentClient.getEntries({
     content_type: "blogPost",
     "fields.slug": slug,
   });
