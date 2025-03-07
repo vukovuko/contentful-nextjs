@@ -3,10 +3,11 @@ import client from "@/lib/contentful";
 import { BlogPost } from "@/types/blog";
 import Link from "next/link";
 
-export default async function BlogPostPage({ params }: { params: { slug: string } }): Promise<React.ReactElement> {
+export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
   const entries = await client.getEntries({
     content_type: "blogPost",
-    "fields.slug": params.slug,
+    "fields.slug": slug,
   });
 
   if (!entries.items.length) {
