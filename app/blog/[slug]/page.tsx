@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import client from "@/lib/contentful";
 import { BlogPost } from "@/types/blog";
 import Link from "next/link";
+import RichText from "@/components/RichText";
+import { Document } from '@contentful/rich-text-types';
 
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -16,6 +18,9 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
   const post = entries.items[0].fields as unknown as BlogPost;
   const author = post.author.fields;
+
+
+  const isRichText = typeof post.text === 'object' && post.text !== null;
 
   return (
     <main className="container mx-auto px-4 py-8">
@@ -71,10 +76,15 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
           </div>
         )}
         
-        <div 
-          className="prose lg:prose-xl max-w-none"
-          dangerouslySetInnerHTML={{ __html: post.text }} 
-        />
+        <div className="prose lg:prose-xl max-w-none">
+          {isRichText ? (
+            // If text is a rich text object
+            <RichText content={post.text as unknown as Document} />
+          ) : (
+            // If text is a string (HTML)
+            <div dangerouslySetInnerHTML={{ __html: post.text }} />
+          )}
+        </div>
         
         {/* Add tags at the bottom of the post */}
         {post.tags && post.tags.length > 0 && (
