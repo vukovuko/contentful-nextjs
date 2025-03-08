@@ -5,6 +5,7 @@ import Link from "next/link";
 import RichText from "@/components/RichText";
 import { Document } from '@contentful/rich-text-types';
 import { cookies } from 'next/headers'
+import MarkdownText from "@/components/MarkdownText";
 
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const cookieStore = await cookies()
@@ -28,6 +29,8 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
 
   const isRichText = typeof post.text === 'object' && post.text !== null;
+
+  console.log(typeof post.text, post.text);
 
   return (
     <main className="container mx-auto px-4 py-8">
@@ -88,8 +91,8 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
             // If text is a rich text object
             <RichText content={post.text as unknown as Document} />
           ) : (
-            // If text is a string (HTML)
-            <div dangerouslySetInnerHTML={{ __html: post.text }} />
+            // If text is a string (markdown or HTML)
+            <MarkdownText content={post.text as string} />
           )}
         </div>
         
