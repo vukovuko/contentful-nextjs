@@ -1,39 +1,130 @@
 import { notFound } from "next/navigation";
-import { client, previewClient } from "@/lib/contentful";
-import { BlogPost } from "@/types/blog";
 import Link from "next/link";
 import RichText from "@/components/RichText";
 import { Document } from '@contentful/rich-text-types';
-import { cookies } from 'next/headers'
 import MarkdownText from "@/components/MarkdownText";
+import { fetchGraphQL } from "@/lib/contentful-graphql";
+import { BlogPost } from "@/types/blog";
+import { isPreviewMode } from '@/lib/contentful-context';
+
+// GraphQL query based exactly on your BlogPost model fields
+const BLOG_POST_QUERY = `
+  query GetBlogPostBySlug($slug: String!, $preview: Boolean = false) {
+    blogPostCollection(
+      where: { slug: $slug },
+      preview: $preview,
+      limit: 1
+    ) {
+      items {
+        sys {
+          id
+        }
+        heading
+        slug
+        text
+        excerpt
+        datePublished
+        dateLastUpdated
+        tags
+        blogPostFeaturedImage {
+          url
+          title
+          description
+        }
+        author {
+          sys {
+            id
+          }
+          name
+          image {
+            url
+            title
+          }
+          joined
+        }
+      }
+    }
+  }
+`;
+
+// Generate static params for common slugs
+export async function generateStaticParams() {
+  // Query to get all blog post slugs
+  const SLUGS_QUERY = `
+    query GetAllSlugs {
+      blogPostCollection {
+        items {
+          slug
+        }
+      }
+    }
+  `;
+
+  const response = await fetchGraphQL(SLUGS_QUERY);
+  
+  return response.data.blogPostCollection.items.map((item: any) => ({
+    slug: item.slug,
+  }));
+}
 
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
-  const cookieStore = await cookies()
-  const previewCookie = cookieStore.get('__prerender_bypass')
-  const isPreview = previewCookie && previewCookie.value === 'true';
-
-  const currentClient = isPreview ? previewClient : client
+  // Check for preview mode using the helper function
+  const isPreview = await isPreviewMode();
   
   const { slug } = await params;
-  const entries = await currentClient.getEntries({
-    content_type: "blogPost",
-    "fields.slug": slug,
+  
+  // Fetch data using GraphQL
+  const response = await fetchGraphQL(BLOG_POST_QUERY, {
+    variables: {
+      slug: slug,
+      preview: isPreview
+    }
   });
 
-  if (!entries.items.length) {
+  // Handle no post found
+  if (!response.data?.blogPostCollection?.items.length) {
     return notFound();
   }
 
-  const post = entries.items[0].fields as unknown as BlogPost;
-  const author = post.author.fields;
+  // Extract post data
+  const postData = response.data.blogPostCollection.items[0];
+  
+  // Transform data to match your BlogPost type
+  const post: BlogPost = {
+    heading: postData.heading,
+    slug: postData.slug,
+    text: postData.text,
+    excerpt: postData.excerpt || undefined,
+    datePublished: postData.datePublished || undefined,
+    dateLastUpdated: postData.dateLastUpdated || undefined,
+    tags: postData.tags || [],
+    blogPostFeaturedImage: postData.blogPostFeaturedImage ? {
+      fields: {
+        file: {
+          url: postData.blogPostFeaturedImage.url
+        }
+      }
+    } : undefined,
+    author: {
+      fields: {
+        name: postData.author.name,
+        image: postData.author.image ? {
+          fields: {
+            file: {
+              url: postData.author.image.url
+            }
+          }
+        } : undefined,
+        joined: postData.author.joined || undefined
+      }
+    }
+  };
 
-
+  // Determine if text is rich text or markdown
   const isRichText = typeof post.text === 'object' && post.text !== null;
 
-  console.log(typeof post.text, post.text);
-
   return (
-    <main className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8">
       <Link href="/blog" className="text-blue-600 hover:underline mb-4 inline-block">
         ← Back to all posts
       </Link>
@@ -57,15 +148,15 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         )}
         
         <div className="flex items-center mb-6">
-          {author.image && (
+          {post.author.fields.image && (
             <img
-              src={`https:${author.image.fields.file.url}`}
-              alt={author.name}
+              src={post.author.fields.image.fields.file.url}
+              alt={post.author.fields.name}
               className="w-10 h-10 rounded-full mr-3"
             />
           )}
           <div>
-            <p className="font-medium">{author.name}</p>
+            <p className="font-medium">{post.author.fields.name}</p>
             {post.datePublished && (
               <p className="text-sm text-gray-500">
                 {new Date(post.datePublished).toLocaleDateString()}
@@ -79,7 +170,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         {post.blogPostFeaturedImage && (
           <div className="mb-6">
             <img 
-              src={`https:${post.blogPostFeaturedImage.fields.file.url}`} 
+              src={post.blogPostFeaturedImage.fields.file.url}
               alt={post.heading} 
               className="w-full h-auto rounded-lg"
             />
@@ -114,6 +205,6 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
           </div>
         )}
       </article>
-    </main>
+    </div>
   );
 }

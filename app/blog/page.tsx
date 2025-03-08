@@ -1,16 +1,84 @@
-import BlogGrid from "@/components/BlogGrid";
-import client from "@/lib/contentful";
+import BlogGrid from "@/components/BlogGrid"; 
+import { fetchGraphQL } from "@/lib/contentful-graphql";
 import { BlogPost } from "@/types/blog";
+import { isPreviewMode } from '@/lib/contentful-context';
+
+// GraphQL query to fetch all blog posts
+const BLOG_POSTS_QUERY = `
+  query GetBlogPosts($preview: Boolean = false) {
+    blogPostCollection(
+      order: [datePublished_DESC],
+      preview: $preview
+    ) {
+      items {
+        sys {
+          id
+        }
+        heading
+        slug
+        text
+        excerpt
+        datePublished
+        dateLastUpdated
+        tags
+        blogPostFeaturedImage {
+          url
+          title
+        }
+        author {
+          name
+          image {
+            url
+          }
+          joined
+        }
+      }
+    }
+  }
+`;
 
 export default async function BlogPage() {
-  // Fetch all blog posts
-  const entries = await client.getEntries({
-    content_type: 'blogPost',
-    order: ['-fields.datePublished'], // Sort by newest first
+  // Check for preview mode using the helper function
+  const isPreview = await isPreviewMode();
+
+  // Fetch all blog posts using GraphQL
+  const response = await fetchGraphQL(BLOG_POSTS_QUERY, {
+    variables: {
+      preview: isPreview
+    }
   });
   
-  const posts = entries.items.map((item) => item.fields as unknown as BlogPost);
-  
+  // Transform the GraphQL response to our BlogPost type structure
+  const posts = response.data.blogPostCollection.items.map((item: any) => ({
+    heading: item.heading,
+    slug: item.slug,
+    text: item.text,
+    excerpt: item.excerpt,
+    datePublished: item.datePublished,
+    dateLastUpdated: item.dateLastUpdated,
+    tags: item.tags || [],
+    blogPostFeaturedImage: item.blogPostFeaturedImage ? {
+      fields: {
+        file: {
+          url: item.blogPostFeaturedImage.url
+        }
+      }
+    } : undefined,
+    author: {
+      fields: {
+        name: item.author.name,
+        image: item.author.image ? {
+          fields: {
+            file: {
+              url: item.author.image.url
+            }
+          }
+        } : undefined,
+        joined: item.author.joined
+      }
+    }
+  }));
+
   return (
     <div className="container mx-auto px-4 py-16">
       <div className="text-center mb-12">

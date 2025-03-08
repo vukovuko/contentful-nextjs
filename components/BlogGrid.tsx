@@ -6,6 +6,17 @@ interface BlogGridProps {
   posts: BlogPost[];
 }
 
+// Helper function to ensure URL has https:
+function ensureHttpsUrl(url: string): string {
+  if (!url) return '';
+  // If URL already has https://, return as is
+  if (url.startsWith('https://')) return url;
+  // If URL starts with //, add https:
+  if (url.startsWith('//')) return `https:${url}`;
+  // Otherwise, assume it needs https:
+  return `https:${url}`;
+}
+
 const BlogGrid: React.FC<BlogGridProps> = ({ posts = [] }) => {
   if (posts.length === 0) {
     return <div className="text-center py-12 text-gray-400">No posts found</div>;
@@ -21,7 +32,7 @@ const BlogGrid: React.FC<BlogGridProps> = ({ posts = [] }) => {
           {post.blogPostFeaturedImage ? (
             <div className="relative h-56 overflow-hidden">
               <img
-                src={`https:${post.blogPostFeaturedImage.fields.file.url}`}
+                src={ensureHttpsUrl(post.blogPostFeaturedImage.fields.file.url)}
                 alt={post.heading}
                 className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
               />
@@ -82,7 +93,7 @@ const BlogGrid: React.FC<BlogGridProps> = ({ posts = [] }) => {
                 <div className="flex items-center">
                   {post.author.fields.image ? (
                     <img
-                      src={`https:${post.author.fields.image.fields.file.url}`}
+                      src={ensureHttpsUrl(post.author.fields.image.fields.file.url)}
                       alt={post.author.fields.name}
                       className="w-8 h-8 rounded-full mr-2 object-cover"
                     />
