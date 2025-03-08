@@ -1,16 +1,20 @@
-// components/MarkdownText.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Components } from 'react-markdown';
 import CodeBlock from './CodeBlock';
 
 interface MarkdownTextProps {
   content: string;
+  imageMaxWidth?: number; // Optional max width constraint for images
 }
 
-const MarkdownText: React.FC<MarkdownTextProps> = ({ content }) => {
+const MarkdownText: React.FC<MarkdownTextProps> = ({ 
+  content,
+  imageMaxWidth = 1200 // Default max width for images
+}) => {
   // Define components for ReactMarkdown with proper TypeScript types
   const components: Components = {
     h1: ({ children }) => (
@@ -65,19 +69,62 @@ const MarkdownText: React.FC<MarkdownTextProps> = ({ content }) => {
       <blockquote className="border-l-4 border-gray-300 pl-4 italic my-4">{children}</blockquote>
     ),
     hr: () => <hr className="my-8 border-t border-gray-300" />,
-    img: ({ src, alt }) => {
-      if (src) {
-        return (
-          <div className="my-6">
-            <img
-              src={src}
-              alt={alt || 'Image'}
-              className="rounded-lg max-w-full h-auto"
-            />
-          </div>
-        );
+    img: (props) => {
+      const { src, alt, title } = props;
+      
+      if (!src) return null;
+      
+      // Parse dimensions from alt text if provided in format: alt [width×height]
+      let width, height;
+      const dimensionsMatch = alt ? alt.match(/\[(\d+)×(\d+)\]/) : null;
+      
+      if (dimensionsMatch) {
+        width = parseInt(dimensionsMatch[1], 10);
+        height = parseInt(dimensionsMatch[2], 10);
       }
-      return null;
+      
+      // Clean alt text by removing dimension notation
+      const cleanAlt = alt ? alt.replace(/\[\d+×\d+\]/, '').trim() : 'Image';
+      
+      return (
+        <figure className="my-6">
+          <div className="relative overflow-hidden rounded-lg">
+            {/* Regular img fallback for external images */}
+            {src.startsWith('http') || src.startsWith('/api/') ? (
+              <div className="relative">
+                <ProgressiveImage 
+                  src={src}
+                  alt={cleanAlt}
+                  maxWidth={imageMaxWidth}
+                  width={width}
+                  height={height}
+                />
+              </div>
+            ) : (
+              // Next.js Image for optimized local images
+              <div className="relative">
+                <Image
+                  src={src}
+                  alt={cleanAlt}
+                  width={width || 1200}
+                  height={height || 800}
+                  className="rounded-lg max-w-full h-auto"
+                  sizes={`(max-width: 768px) 100vw, ${imageMaxWidth}px`}
+                  style={{
+                    maxWidth: '100%',
+                    height: 'auto',
+                  }}
+                />
+              </div>
+            )}
+          </div>
+          {title && (
+            <figcaption className="text-center text-sm text-gray-500 mt-2 italic">
+              {title}
+            </figcaption>
+          )}
+        </figure>
+      );
     },
     code: (props: any) => {
       const { className, children, inline } = props;
@@ -121,6 +168,63 @@ const MarkdownText: React.FC<MarkdownTextProps> = ({ content }) => {
         {content}
       </ReactMarkdown>
     </div>
+  );
+};
+
+// Progressive image loading component with loading states
+const ProgressiveImage: React.FC<{
+  src: string;
+  alt: string;
+  maxWidth?: number;
+  width?: number;
+  height?: number;
+}> = ({ src, alt, maxWidth, width, height }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  return (
+    <>
+      {isLoading && (
+        <div 
+          className="animate-pulse bg-gray-200 rounded-lg"
+          style={{ 
+            width: '100%', 
+            paddingBottom: height && width ? `${(height / width * 100)}%` : '56.25%' // Default to 16:9 aspect ratio
+          }}
+        />
+      )}
+      
+      {error ? (
+        <div className="flex items-center justify-center border border-gray-200 rounded-lg p-4 bg-gray-50" style={{ minHeight: '200px' }}>
+          <div className="text-center text-gray-500">
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              className="h-12 w-12 mx-auto text-gray-400 mb-2" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <p>Failed to load image</p>
+          </div>
+        </div>
+      ) : (
+        <img
+          src={src}
+          alt={alt}
+          className={`rounded-lg max-w-full h-auto ${isLoading ? 'hidden' : 'block'}`}
+          style={{ maxWidth: maxWidth ? `${maxWidth}px` : '100%' }}
+          onLoad={() => setIsLoading(false)}
+          onError={() => {
+            setIsLoading(false);
+            setError(true);
+          }}
+          width={width}
+          height={height}
+        />
+      )}
+    </>
   );
 };
 
